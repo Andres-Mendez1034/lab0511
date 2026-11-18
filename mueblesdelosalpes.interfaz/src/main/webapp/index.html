@@ -1,51 +1,301 @@
 <!doctype html>
-<html lang="en" ng-app="angularTodo">
+<html lang="es">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Muebles De Los Alpes</title>
-	<link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Muebles De Los Alpes - Vendedores</title>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css">
+    <style>
+        body { background: #f4f1eb; color: #2f302d; }
+        .catalog-section { margin-bottom: 30px; }
+        .catalog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .furniture-card {
+            background: #fff;
+            border: 1px solid #ded8ce;
+            border-radius: 6px;
+            padding: 18px;
+            min-height: 220px;
+            box-shadow: 0 2px 6px rgba(70, 58, 42, 0.08);
+        }
+        .furniture-card h3 { margin-top: 0; color: #735b40; font-size: 20px; }
+        .furniture-card .badge { background: #8a7152; }
+        .furniture-price { color: #4f7147; font-size: 20px; font-weight: bold; }
+        .jumbotron { background: #fff; border: 1px solid #ded8ce; }
+    </style>
 </head>
-<body ng-controller="mainController">
-	<div class="container">
-		<!--Cabecera-->
-		<div class="jumbotron text-center">
-			<h1>Elementos Disponibles <span class="label label-info">{{ items.length }}</span></h1>
-		</div>
+<body>
+<div class="container">
 
-		<!--Lista de Todos-->
-		<div id="item-list" class="row">
-			<div class="col-sm-4 col-sm-offset-4">
-				<div class="checkbox" ng-repeat="i in items">
-					<label>
-						<input type="checkbox" ng-click="anadirCarro(i)"> 
-						{{ i.nombre}}
-					</label>
-				</div>
-			</div>
-		</div>
+    <div class="jumbotron text-center">
+        <h1>Muebles De Los Alpes</h1>
+        <p>Catálogo y gestión de vendedores</p>
+    </div>
 
-		<!--Formulario para insertar nuevos Todo
-		<div id="todo-form" class="row">
-			<div class="col-sm-8 col-sm-offset-2 text-center">
-				<form>
-                                    <label ng-repeat="mueble in muebles">
-  <input type="checkbox" checklist-model="user.roles" checklist-value="role"> {{role}}
-</label>
-					<div class="form-group">
-						<input type="text" class="form-control input-lg text-center" 
-								placeholder="Inserta una tarea nueva"
-								ng-model="formData.text">
-                                                
-					</div>
-					<button class="btn btn-primary btn-lg" ng-click="createTodo()">Añadir</button>
-				</form>
-			</div>
-		</div>
-	</div>-->
+    <div id="message" class="alert" role="alert" style="display:none"></div>
 
-	<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
-	<script src="//ajax.googleapis.com/ajax/libs/angularjs/1.0.8/angular.min.js"></script>
-	<script src="main.js"></script>
+    <section class="catalog-section">
+        <h2>Catálogo <span id="catalog-count" class="label label-info">0</span></h2>
+        <div id="catalog-list" class="catalog-grid"></div>
+    </section>
+
+    <h2>Vendedores <span id="item-count" class="label label-info">0</span></h2>
+    <table class="table table-striped">
+        <thead>
+            <tr><th>ID</th><th>Nombres</th><th>Apellidos</th><th>Salario</th><th>Acciones</th></tr>
+        </thead>
+        <tbody id="vendor-list"></tbody>
+    </table>
+
+    <div class="panel panel-default">
+        <div class="panel-heading"><b id="form-title">Nuevo vendedor</b></div>
+        <div class="panel-body">
+            <form id="vendor-form">
+                <input id="names" type="text" class="form-control" placeholder="Nombres" style="margin-bottom:8px">
+                <input id="last-names" type="text" class="form-control" placeholder="Apellidos" style="margin-bottom:8px">
+                <input id="salary" type="number" class="form-control" placeholder="Salario" style="margin-bottom:8px">
+                <button id="save-button" type="submit" class="btn btn-primary">Añadir (POST)</button>
+                <button id="cancel-button" type="button" class="btn btn-default" style="display:none">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <p class="text-muted"><small>Servicio: <span id="service-url"></span></small></p>
+</div>
+
+<script>
+(function() {
+    var url = '../mueblesdelosalpes.servicios/webresources/Vendedores';
+    var catalogUrl = '../mueblesdelosalpes.servicios/webresources/Catalogo/muebles';
+    var items = [];
+    var catalogItems = [];
+    var editingVendor = null;
+    var list = document.getElementById('vendor-list');
+    var catalogList = document.getElementById('catalog-list');
+    var message = document.getElementById('message');
+    var form = document.getElementById('vendor-form');
+    var names = document.getElementById('names');
+    var lastNames = document.getElementById('last-names');
+    var salary = document.getElementById('salary');
+    var formTitle = document.getElementById('form-title');
+    var saveButton = document.getElementById('save-button');
+    var cancelButton = document.getElementById('cancel-button');
+
+    document.getElementById('service-url').textContent = url;
+
+    function showMessage(text, isSuccess) {
+        message.className = 'alert ' + (isSuccess ? 'alert-success' : 'alert-danger');
+        message.textContent = text;
+        message.style.display = 'block';
+    }
+
+    function request(method, requestUrl, body, success, failure) {
+        var xhr = new XMLHttpRequest();
+        xhr.open(method, requestUrl, true);
+        xhr.setRequestHeader('Accept', 'application/json');
+        if (body !== null) {
+            xhr.setRequestHeader('Content-Type', 'application/json');
+        }
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== 4) {
+                return;
+            }
+            if (xhr.status >= 200 && xhr.status < 300) {
+                var data = null;
+                if (xhr.responseText) {
+                    try {
+                        data = JSON.parse(xhr.responseText);
+                    } catch (error) {
+                        failure('Respuesta JSON inválida del servidor.', xhr.status);
+                        return;
+                    }
+                }
+                success(data);
+            } else {
+                failure(xhr.responseText || xhr.statusText || 'Error de conexión.', xhr.status);
+            }
+        };
+        xhr.onerror = function() {
+            failure('No fue posible conectar con el servicio.', xhr.status);
+        };
+        xhr.send(body === null ? null : JSON.stringify(body));
+    }
+
+    function loadVendors() {
+        request('GET', url, null, function(data) {
+            items = Array.isArray(data) ? data : [];
+            renderVendors();
+        }, function(details, status) {
+            showMessage('Error en GET (HTTP ' + status + '): ' + details, false);
+        });
+    }
+
+    function renderCatalog() {
+        document.getElementById('catalog-count').textContent = catalogItems.length;
+        catalogList.textContent = '';
+
+        catalogItems.forEach(function(furniture) {
+            var card = document.createElement('article');
+            card.className = 'furniture-card';
+
+            var title = document.createElement('h3');
+            title.textContent = furniture.nombre;
+            card.appendChild(title);
+
+            var type = document.createElement('span');
+            type.className = 'badge';
+            type.textContent = furniture.tipo;
+            card.appendChild(type);
+
+            var description = document.createElement('p');
+            description.textContent = furniture.descripcion;
+            description.style.marginTop = '12px';
+            card.appendChild(description);
+
+            var price = document.createElement('div');
+            price.className = 'furniture-price';
+            price.textContent = '$' + Number(furniture.precio).toLocaleString('es-CO');
+            card.appendChild(price);
+
+            var stock = document.createElement('p');
+            stock.className = 'text-muted';
+            stock.textContent = furniture.cantidad + ' disponibles';
+            card.appendChild(stock);
+
+            catalogList.appendChild(card);
+        });
+    }
+
+    function loadCatalog() {
+        request('GET', catalogUrl, null, function(data) {
+            catalogItems = Array.isArray(data) ? data : [];
+            renderCatalog();
+        }, function(details, status) {
+            catalogList.textContent = 'Error cargando el catálogo (HTTP ' + status + '): ' + details;
+        });
+    }
+
+    function addCell(row, value) {
+        var cell = document.createElement('td');
+        cell.textContent = value === null || typeof value === 'undefined' ? '' : value;
+        row.appendChild(cell);
+    }
+
+    function renderVendors() {
+        document.getElementById('item-count').textContent = items.length;
+        list.textContent = '';
+
+        items.forEach(function(vendor) {
+            var row = document.createElement('tr');
+            addCell(row, vendor.identificacion);
+            addCell(row, vendor.nombres);
+            addCell(row, vendor.apellidos);
+            addCell(row, vendor.salario);
+
+            var actions = document.createElement('td');
+            var editButton = document.createElement('button');
+            editButton.type = 'button';
+            editButton.className = 'btn btn-default btn-xs';
+            editButton.textContent = 'Editar';
+            editButton.onclick = function() { edit(vendor); };
+            actions.appendChild(editButton);
+
+            var deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.className = 'btn btn-danger btn-xs';
+            deleteButton.textContent = 'Borrar';
+            deleteButton.style.marginLeft = '4px';
+            deleteButton.onclick = function() { remove(vendor); };
+            actions.appendChild(deleteButton);
+            row.appendChild(actions);
+            list.appendChild(row);
+        });
+    }
+
+    function clearForm() {
+        form.reset();
+        editingVendor = null;
+        formTitle.textContent = 'Nuevo vendedor';
+        saveButton.textContent = 'Añadir (POST)';
+        cancelButton.style.display = 'none';
+    }
+
+    function edit(vendor) {
+        editingVendor = vendor;
+        names.value = vendor.nombres || '';
+        lastNames.value = vendor.apellidos || '';
+        salary.value = vendor.salario || 0;
+        formTitle.textContent = 'Editando vendedor ' + vendor.identificacion;
+        saveButton.textContent = 'Guardar cambios (PUT)';
+        cancelButton.style.display = '';
+        message.style.display = 'none';
+    }
+
+    function copyVendor(vendor) {
+        var copy = {};
+        var key;
+        for (key in vendor) {
+            if (Object.prototype.hasOwnProperty.call(vendor, key)) {
+                copy[key] = vendor[key];
+            }
+        }
+        return copy;
+    }
+
+    form.onsubmit = function(event) {
+        event.preventDefault();
+        if (!names.value.trim()) {
+            showMessage('Escribe al menos los nombres.', false);
+            return;
+        }
+
+        var vendor;
+        var method;
+        var requestUrl = url;
+        if (editingVendor) {
+            vendor = copyVendor(editingVendor);
+            vendor.identificacion = editingVendor.identificacion;
+            method = 'PUT';
+            requestUrl += '/' + editingVendor.identificacion;
+        } else {
+            vendor = {
+                comisionVentas: 0,
+                perfil: '',
+                foto: 'vendedor1',
+                experiencia: []
+            };
+            method = 'POST';
+        }
+        vendor.nombres = names.value.trim();
+        vendor.apellidos = lastNames.value.trim();
+        vendor.salario = parseFloat(salary.value) || 0;
+
+        request(method, requestUrl, vendor, function() {
+            showMessage(editingVendor ? 'Vendedor actualizado (PUT).' : 'Vendedor creado (POST).', true);
+            clearForm();
+            loadCatalog();
+            loadVendors();
+        }, function(details, status) {
+            showMessage('Error en ' + method + ' (HTTP ' + status + '): ' + details, false);
+        });
+    };
+
+    cancelButton.onclick = clearForm;
+
+    function remove(vendor) {
+        request('DELETE', url + '/' + vendor.identificacion, null, function() {
+            showMessage('Vendedor ' + vendor.identificacion + ' eliminado (DELETE).', true);
+            loadVendors();
+        }, function(details, status) {
+            showMessage('Error en DELETE (HTTP ' + status + '): ' + details, false);
+        });
+    }
+
+    loadVendors();
+}());
+</script>
 </body>
 </html>
