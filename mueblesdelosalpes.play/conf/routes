@@ -1,0 +1,3 @@
+GET     /webresources/Catalogo/muebles          controllers.CatalogoController.muebles
+POST    /webresources/Catalogo/muebles          controllers.CatalogoController.agregar
+POST    /webresources/CarroCompras/agregar      controllers.CatalogoController.agregarAlCarrito
