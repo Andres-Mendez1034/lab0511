@@ -22,34 +22,22 @@ import javax.ws.rs.core.Response;
 @Produces(MediaType.APPLICATION_JSON)
 public class CatalogoService {
 
-    /**
-     * Referencia al EJB del catalogo encargado de realizar las operaciones del mismo.
-     */
     @EJB
     private IServicioCatalogoMockLocal catalogoEjb;
 
-    /**
-     * GET: lista JSON con los muebles disponibles para la venta.
-     */
     @GET
-    @Path("muebles/")
+    @Path("muebles")
     public List<Mueble> getTodosLosMuebles() {
         return catalogoEjb.darMuebles();
     }
 
-    /**
-     * POST: agrega un mueble al catalogo. Recibe el mueble en JSON.
-     */
     @POST
-    @Path("muebles/")
+    @Path("muebles")
     public Response agregarMueble(Mueble mueble) {
         catalogoEjb.agregarMueble(mueble);
         return Response.status(Response.Status.CREATED).entity(mueble).build();
     }
 
-    /**
-     * PUT: remueve un ejemplar del mueble (no el mueble completo).
-     */
     @PUT
     @Path("muebles/{id}/quitar-ejemplar")
     public Response removerEjemplarMueble(@PathParam("id") long id) {
@@ -57,9 +45,6 @@ public class CatalogoService {
         return Response.ok().build();
     }
 
-    /**
-     * DELETE: elimina un mueble del sistema por su referencia.
-     */
     @DELETE
     @Path("muebles/{id}")
     public Response eliminarMueble(@PathParam("id") long id) {
